@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block title %}Testing & Simulation Lab | CyberGuard Sentinel{% endblock %}
+{% block page_title %}Security Simulation & Testing Lab{% endblock %}
+{% block page_subtitle %}Execute Controlled Behavioral Deviations & Validate Anomaly Detection In Real-Time{% endblock %}
+
+{% block content %}
+<!-- Safeguard & Live Defense Mode Banner -->
+<div class="alert alert-dark border border-secondary mb-4 p-3" style="background-color: #121824;">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div class="d-flex align-items-center gap-3">
+      <div class="avatar-sm rounded-circle bg-dark border border-info d-flex align-items-center justify-content-center text-info" style="width: 44px; height: 44px;">
+        <i class="fas fa-shield-virus fa-lg"></i>
+      </div>
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <h6 class="mb-0 text-light fw-bold">Live Account Testing & Behavioral Attack Lab</h6>
+          <span id="modeStatusBadge" class="badge bg-secondary font-monospace" style="font-size: 0.72rem;">LAB MODE (SIMULATED)</span>
+        </div>
+        <small id="modeStatusDesc" class="text-secondary">Simulated events are tagged with <span class="badge-simulated font-monospace">IS_SIMULATED = TRUE</span> (dry-run without locking accounts). Toggle <strong>Live Mode</strong> to execute real SOAR lockdowns and live dashboard alerts.</small>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-3">
+      <!-- Target User Dropdown -->
+      <div class="d-flex align-items-center gap-2">
+        <label class="text-secondary small font-monospace"><i class="fas fa-user-shield me-1 text-info"></i>Target User:</label>
+        <select id="simulationTargetUser" class="cyber-select form-select-sm" style="min-width: 175px;">
+          {% for u in users %}
+            <option value="{{ u.username }}" {% if u.username == 'test.user' %}selected{% endif %}>{{ u.username }} ({{ u.department }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Live Defense Mode Switch -->
+      <div class="form-check form-switch d-flex align-items-center gap-2 ps-0 m-0 p-2 rounded border border-secondary" style="background: rgba(15, 23, 42, 0.6);">
+        <input class="form-check-input ms-2" type="checkbox" id="liveModeToggle" role="switch" onchange="toggleLiveDefenseMode(this.checked)" style="cursor: pointer; width: 2.2rem; height: 1.2rem;">
+        <label class="form-check-label text-warning small fw-bold font-monospace pe-2 mb-0" for="liveModeToggle" style="cursor: pointer;">
+          <i class="fas fa-bolt text-danger me-1"></i>Live Account Defense Mode
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Live Simulation Evaluation Container -->
+<div id="simulationLiveResult" class="mb-4">
+  <!-- Populated by JavaScript when user clicks 'Simulate Scenario' -->
+</div>
+
+<!-- 6 Dedicated Scenario Cards -->
+<div class="row g-3 mb-4">
+  {% for key, sc in scenarios.items() %}
+    <div class="col-md-6 col-lg-4">
+      <div class="cyber-card h-100 d-flex flex-direction-column justify-content-between">
+        <div>
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <h6 class="text-light fw-bold mb-0">{{ sc.title }}</h6>
+            <span class="badge bg-dark border border-secondary text-secondary font-monospace" style="font-size: 0.68rem;">LAB SCENARIO</span>
+          </div>
+
+          <p class="text-secondary small mb-3">{{ sc.desc }}</p>
+
+          <div class="p-2 rounded bg-dark border border-secondary font-monospace small mb-3" style="font-size: 0.75rem;">
+            <div class="d-flex justify-content-between text-secondary mb-1">
+              <span>Expected Tier:</span>
+              <strong class="{% if 'Low' in sc.expected_risk %}text-success{% elif 'Medium' in sc.expected_risk %}text-warning{% else %}text-danger{% endif %}">{{ sc.expected_risk }}</strong>
+            </div>
+            <div class="d-flex justify-content-between text-secondary mb-1">
+              <span>Login Hour:</span>
+              <span class="text-light">{{ "%02d:00"|format(sc.hour) }}</span>
+            </div>
+            <div class="d-flex justify-content-between text-secondary mb-1">
+              <span>Client IP:</span>
+              <span class="text-info">{{ sc.ip }}</span>
+            </div>
+            <div class="d-flex justify-content-between text-secondary">
+              <span>Target Resource:</span>
+              <span class="text-truncate" style="max-width: 140px;"><code>{{ sc.resource }}</code></span>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-cyber-primary btn-sm w-100" onclick="runScenarioSimulation('{{ key }}')">
+          <i class="fas fa-play me-1"></i>Simulate {{ sc.title.split('. ')[1] if '. ' in sc.title else sc.title }}
+        </button>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<!-- Recent Simulations History Table -->
+<div class="cyber-table-container">
+  <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold text-light"><i class="fas fa-history text-info me-2"></i>Recent Test Simulation History</h6>
+      <small class="text-secondary font-monospace">Log of synthetic attack simulations generated in the lab</small>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="cyber-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Timestamp (UTC)</th>
+          <th>Target Principal</th>
+          <th>Location / Node</th>
+          <th>IP Address</th>
+          <th>Target Resource</th>
+          <th>ML Outlier</th>
+          <th>Risk Score</th>
+          <th class="text-end">Forensic Inspection</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if recent_simulations %}
+          {% for sim in recent_simulations %}
+            {% set det = sim.detection_result %}
+            <tr>
+              <td class="font-monospace text-secondary">#{{ sim.id }}</td>
+              <td class="font-monospace text-secondary" style="font-size: 0.8rem;">{{ sim.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+              <td><strong class="text-light">{{ sim.username }}</strong> <span class="badge-simulated ms-1">SIM</span></td>
+              <td class="small text-secondary">{{ sim.location }}</td>
+              <td class="font-monospace text-secondary" style="font-size: 0.8rem;">{{ sim.ip_address }}</td>
+              <td><code class="text-info small">{{ sim.accessed_resource }}</code></td>
+              <td>
+                {% if det and det.is_ml_anomaly %}
+                  <span class="badge bg-danger font-monospace">OUTLIER</span>
+                {% else %}
+                  <span class="badge bg-dark border border-secondary text-secondary font-monospace">NORMAL</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if det %}
+                  {% if det.risk_level == 'High' %}
+                    <span class="badge-risk-high">{{ det.calculated_risk_score|round(1) }}</span>
+                  {% elif det.risk_level == 'Medium' %}
+                    <span class="badge-risk-med">{{ det.calculated_risk_score|round(1) }}</span>
+                  {% else %}
+                    <span class="badge-risk-low">{{ det.calculated_risk_score|round(1) }}</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted">N/A</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-dark border border-secondary" onclick="inspectActivity({{ sim.id }})" title="View Telemetry Forensics">
+                  <i class="fas fa-magnifying-glass text-info"></i>
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="9" class="text-center py-4 text-secondary">
+              No simulations executed yet. Click any scenario button above to generate a live test event.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

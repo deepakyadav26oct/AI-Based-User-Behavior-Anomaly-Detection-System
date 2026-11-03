@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}Security Reports & Compliance | CyberGuard Sentinel{% endblock %}
+{% block page_title %}Security Reports & Compliance Audit{% endblock %}
+{% block page_subtitle %}Executive PDF Cybersecurity Reports, Risk Distributions & Remediation Guidance{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <!-- Report Generation Card -->
+  <div class="col-lg-5">
+    <div class="cyber-card h-100">
+      <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary">
+        <i class="fas fa-file-pdf text-danger fa-lg"></i>
+        <h6 class="mb-0 fw-bold text-light">Generate SOC Security Audit Report</h6>
+      </div>
+
+      <p class="text-secondary small mb-4">
+        Synthesizes an executive-level, cryptographically identifiable PDF security audit report compiling monitored user activity volumes, Isolation Forest anomaly rates, top targeted resources, and risk tier distributions with SOC remediation actions.
+      </p>
+
+      <div class="p-3 rounded bg-dark border border-secondary mb-4 small font-monospace">
+        <span class="text-info fw-bold d-block mb-1"><i class="fas fa-circle-info me-1"></i>Report Sections Included:</span>
+        <ul class="text-secondary ps-3 mb-0" style="font-size: 0.78rem;">
+          <li>Executive Monitored Telemetry Summary</li>
+          <li>Isolation Forest Anomaly & Outlier Distribution</li>
+          <li>High-Risk Incidents & Targeted Asset Forensics</li>
+          <li>Actionable Remediation Guidance & Safeguard Actions</li>
+        </ul>
+      </div>
+
+      <form method="POST" action="{{ url_for('report.generate_report') }}">
+        <button type="submit" class="btn btn-cyber-primary w-100 py-2">
+          <i class="fas fa-file-export me-2"></i>Generate PDF Security Report Now
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Recommended Remediations Summary Card -->
+  <div class="col-lg-7">
+    <div class="cyber-card h-100">
+      <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary">
+        <i class="fas fa-shield-halved text-info fa-lg"></i>
+        <h6 class="mb-0 fw-bold text-light">Standard Incident Remediation Playbooks</h6>
+      </div>
+
+      <div class="list-group list-group-flush bg-transparent">
+        <div class="list-group-item bg-transparent text-secondary px-0 py-2 border-secondary small">
+          <strong class="text-light d-block"><i class="fas fa-key text-warning me-1"></i>1. Brute-Force Password Spray Protocol</strong>
+          Immediately apply rate-limiting IP bans at edge proxies and flag the user account for mandatory multi-factor authentication (MFA) step-up.
+        </div>
+        <div class="list-group-item bg-transparent text-secondary px-0 py-2 border-secondary small">
+          <strong class="text-light d-block"><i class="fas fa-user-clock text-info me-1"></i>2. Off-Hours Access (Midnight Ingress)</strong>
+          Verify identity via out-of-band communication; verify if legitimate off-hours work was pre-authorized with management.
+        </div>
+        <div class="list-group-item bg-transparent text-secondary px-0 py-2 border-secondary small">
+          <strong class="text-light d-block"><i class="fas fa-lock text-danger me-1"></i>3. Behavioral Baseline Locking</strong>
+          Freeze and lock baseline profile for any user exhibiting elevated anomalies to safeguard against adversarial model poisoning attacks.
+        </div>
+        <div class="list-group-item bg-transparent text-secondary px-0 py-2 border-secondary small">
+          <strong class="text-light d-block"><i class="fas fa-server text-danger me-1"></i>4. Critical Asset Access Exfiltration</strong>
+          Immediately review system session logs for database credential endpoints and terminate active sessions if unauthorized.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Past Generated Reports Table -->
+<div class="cyber-table-container">
+  <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold text-light"><i class="fas fa-archive text-info me-2"></i>Generated Security Reports Archive</h6>
+      <small class="text-secondary font-monospace">Downloadable PDF reports stored in secure archive</small>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="cyber-table">
+      <thead>
+        <tr>
+          <th>Document Name</th>
+          <th>File Size</th>
+          <th>Generation Timestamp (UTC)</th>
+          <th>Format</th>
+          <th class="text-end">Download</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if reports %}
+          {% for r in reports %}
+            <tr>
+              <td>
+                <i class="fas fa-file-pdf text-danger me-2"></i>
+                <strong class="text-light font-monospace">{{ r.filename }}</strong>
+              </td>
+              <td class="font-monospace text-secondary small">{{ r.size_kb }} KB</td>
+              <td class="font-monospace text-secondary small">{{ r.created_at }}</td>
+              <td><span class="badge bg-dark border border-secondary text-secondary font-monospace">PDF / A-1b</span></td>
+              <td class="text-end">
+                <a href="{{ url_for('report.download_report', filename=r.filename) }}" class="btn btn-cyber-primary btn-sm">
+                  <i class="fas fa-download me-1"></i>Download PDF
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="5" class="text-center py-5 text-secondary">
+              <i class="fas fa-file-circle-question fa-2x mb-2 d-block"></i>
+              No PDF reports generated yet. Click "Generate PDF Security Report Now" above to compile the first report.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

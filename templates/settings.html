@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+
+{% block title %}System Settings & Audit Log | CyberGuard Sentinel{% endblock %}
+{% block page_title %}System Settings & Operational Governance{% endblock %}
+{% block page_subtitle %}Adjust ML Hyperparameters, Risk Categorization Boundaries & Review Audit Trail{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <!-- System Settings Form -->
+  <div class="col-lg-6">
+    <div class="cyber-card h-100">
+      <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary">
+        <i class="fas fa-sliders text-info fa-lg"></i>
+        <h6 class="mb-0 fw-bold text-light">Detection & Risk Engine Parameters</h6>
+      </div>
+
+      <form method="POST" action="{{ url_for('settings.update_settings') }}" id="settingsForm">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label text-secondary small font-monospace">ML Contamination Rate</label>
+            <input type="number" step="0.01" min="0.01" max="0.5" name="contamination" class="form-control cyber-input" value="{{ settings.contamination }}">
+            <small class="text-muted" style="font-size: 0.7rem;">Expected outlier proportion (default: 0.08)</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-secondary small font-monospace">Isolation Forest Estimators</label>
+            <input type="number" step="10" min="50" max="500" name="n_estimators" class="form-control cyber-input" value="{{ settings.n_estimators }}">
+            <small class="text-muted" style="font-size: 0.7rem;">Number of base ensemble trees (default: 150)</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-secondary small font-monospace">Low Risk Maximum Boundary</label>
+            <input type="number" min="10" max="50" name="risk_low_max" class="form-control cyber-input" value="{{ settings.risk_low_max }}">
+            <small class="text-muted" style="font-size: 0.7rem;">Scores &le; this value are Low Risk (default: 29)</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label text-secondary small font-monospace">High Risk Minimum Boundary</label>
+            <input type="number" min="50" max="90" name="risk_high_min" class="form-control cyber-input" value="{{ settings.risk_high_min }}">
+            <small class="text-muted" style="font-size: 0.7rem;">Scores &ge; this value are High Risk (default: 70)</small>
+          </div>
+          <div class="col-md-12">
+            <label class="form-label text-secondary small font-monospace">Alert Trigger Threshold</label>
+            <input type="number" min="15" max="80" name="alert_trigger" class="form-control cyber-input" value="{{ settings.alert_trigger }}">
+            <small class="text-muted" style="font-size: 0.7rem;">Minimum risk score required to automatically raise a Security Alert (default: 30)</small>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-cyber-primary btn-sm">
+          <i class="fas fa-floppy-disk me-1"></i>Save System Operational Parameters
+        </button>
+    </div>
+  </div>
+
+  <!-- SOC Real-Time Webhook Alerting -->
+  <div class="col-lg-6">
+    <div class="cyber-card h-100">
+      <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-satellite-dish text-info fa-lg"></i>
+          <h6 class="mb-0 fw-bold text-light">SOC Real-Time Webhook Alerting</h6>
+        </div>
+        <span class="badge bg-dark border border-secondary font-monospace text-info">Discord / Slack / REST</span>
+      </div>
+
+      <p class="text-secondary small mb-3" style="font-size: 0.8rem;">
+        Instantly route critical threat detections, brute force attacks, impossible travel alerts, and account lockdowns to your external SOC communication channel.
+      </p>
+
+      <div class="mb-3">
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input bg-dark border-secondary" type="checkbox" name="webhook_enabled" id="webhookEnabledSwitch" value="true" form="settingsForm" {% if settings.webhook_enabled == 'true' %}checked{% endif %}>
+          <label class="form-check-label text-light small fw-bold font-monospace" for="webhookEnabledSwitch">
+            Enable Live Webhook Threat Dispatch
+          </label>
+        </div>
+
+        <label class="form-label text-secondary small font-monospace">Incoming Webhook Target URL</label>
+        <div class="input-group mb-2">
+          <span class="input-group-text bg-dark border-secondary text-secondary"><i class="fas fa-link"></i></span>
+          <input type="url" name="webhook_url" id="webhookUrlInput" class="form-control cyber-input font-monospace" form="settingsForm" placeholder="https://discord.com/api/webhooks/... or https://hooks.slack.com/..." value="{{ settings.webhook_url }}">
+        </div>
+        <small class="text-muted d-block mb-3" style="font-size: 0.7rem;">Supports Discord Webhook Embeds, Slack Incoming Webhooks, or Generic JSON HTTP POST endpoints.</small>
+
+        <div class="row g-2 align-items-center">
+          <div class="col-md-7">
+            <label class="form-label text-secondary small font-monospace mb-1">Dispatch Trigger Policy</label>
+            <select name="webhook_min_severity" class="cyber-select w-100" form="settingsForm">
+              <option value="HIGH" {% if settings.webhook_min_severity == 'HIGH' %}selected{% endif %}>High & Critical Severity (Risk &ge; 70 + Lockouts)</option>
+              <option value="MEDIUM" {% if settings.webhook_min_severity == 'MEDIUM' %}selected{% endif %}>Medium & Above (Risk &ge; 30)</option>
+            </select>
+          </div>
+          <div class="col-md-5 text-end pt-3">
+            <button type="button" class="btn btn-outline-info btn-sm w-100" onclick="sendTestWebhookPing()">
+              <i class="fas fa-paper-plane me-1"></i>Test Webhook Ping
+            </button>
+          </div>
+        </div>
+
+        <div id="webhookTestResult" class="mt-3 d-none"></div>
+      </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <!-- Operational Utilities -->
+  <div class="col-lg-6">
+    <div class="cyber-card h-100">
+      <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary">
+        <i class="fas fa-trash-can text-danger fa-lg"></i>
+        <h6 class="mb-0 fw-bold text-light">Maintenance & Data Hygiene</h6>
+      </div>
+
+      <p class="text-secondary small mb-3">
+        Purge simulated events generated during testing sessions. Leaves real, authentic user telemetry and baselines completely intact.
+      </p>
+
+      <form method="POST" action="{{ url_for('settings.purge_simulated_data') }}" onsubmit="return confirm('Purge all simulated lab test activities and alerts? Real user data will NOT be touched.');">
+        <button type="submit" class="btn btn-cyber-danger w-100 mb-2">
+          <i class="fas fa-broom me-2"></i>Purge All Simulated Test Records
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Security Safeguards -->
+  <div class="col-lg-6">
+    <div class="cyber-card h-100">
+      <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary">
+        <i class="fas fa-shield-halved text-success fa-lg"></i>
+        <h6 class="mb-0 fw-bold text-light">Cryptographic & Defensive Architecture</h6>
+      </div>
+
+      <div class="p-3 rounded bg-dark border border-secondary small">
+        <ul class="text-secondary ps-3 mb-0" style="font-size: 0.78rem;">
+          <li class="mb-1"><strong class="text-light">Password Hashing:</strong> Werkzeug Scrypt / PBKDF2 (NIST compliant)</li>
+          <li class="mb-1"><strong class="text-light">Session Cookies:</strong> HTTP-Only, SameSite Lax, Encrypted Sessions</li>
+          <li class="mb-1"><strong class="text-light">Active Threat Defense:</strong> Automated account lockout on Critical events</li>
+          <li class="mb-1"><strong class="text-light">Anti-Poisoning Baselining:</strong> Malicious events strictly blocked from baseline updates</li>
+          <li><strong class="text-light">SOC Integration:</strong> Zero-latency asynchronous webhook worker thread dispatch</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Active Firewall Quarantined IPs Table -->
+<div class="cyber-table-container mb-4">
+  <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold text-light"><i class="fas fa-shield-virus text-danger me-2"></i>Active Firewall Quarantined IP Subnets</h6>
+      <small class="text-secondary font-monospace">Adversarial and attacker IP addresses actively quarantined by Sentinel SOAR Threat Shield</small>
+    </div>
+    <span class="badge bg-danger font-monospace">ACTIVE FIREWALL DEFENSE</span>
+  </div>
+
+  <div class="table-responsive">
+    <table class="cyber-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Quarantined IP</th>
+          <th>Quarantine Rationale</th>
+          <th>Blocked By</th>
+          <th>Timestamp (UTC)</th>
+          <th>Status</th>
+          <th class="text-end">SOAR Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if blocked_ips %}
+          {% for b in blocked_ips %}
+            <tr>
+              <td class="font-monospace text-secondary">#{{ b.id }}</td>
+              <td class="font-monospace text-danger fw-bold"><i class="fas fa-ban me-1"></i>{{ b.ip_address }}</td>
+              <td class="small text-light">{{ b.reason }}</td>
+              <td><span class="badge bg-dark border border-secondary text-info">{{ b.blocked_by }}</span></td>
+              <td class="font-monospace text-secondary small">{{ b.blocked_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td>
+                {% if b.is_active %}
+                  <span class="badge bg-danger font-monospace">BLOCKED</span>
+                {% else %}
+                  <span class="badge bg-secondary font-monospace">RELEASED</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if b.is_active %}
+                  <button class="btn btn-sm btn-outline-success" onclick="unblockIP('{{ b.ip_address }}')">
+                    <i class="fas fa-unlock me-1"></i>Release / Unblock
+                  </button>
+                {% else %}
+                  <button class="btn btn-sm btn-outline-danger" onclick="quarantineIP('{{ b.ip_address }}')">
+                    <i class="fas fa-lock me-1"></i>Re-Block
+                  </button>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="text-center py-4 text-secondary">
+              No IP addresses are currently quarantined in the firewall blocklist.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- System Audit Logs Table -->
+<div class="cyber-table-container">
+  <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold text-light"><i class="fas fa-list-check text-info me-2"></i>System Security Audit Trail</h6>
+      <small class="text-secondary font-monospace">Immutable audit log of all administrative actions, triage decisions, and system events</small>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="cyber-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Timestamp (UTC)</th>
+          <th>Actor Principal</th>
+          <th>Action</th>
+          <th>Audit Details</th>
+          <th>Client IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if audit_logs %}
+          {% for log in audit_logs %}
+            <tr>
+              <td class="font-monospace text-secondary">#{{ log.id }}</td>
+              <td class="font-monospace text-secondary" style="font-size: 0.8rem;">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+              <td><strong class="text-info">{{ log.username }}</strong></td>
+              <td><span class="badge bg-dark border border-secondary font-monospace text-light" style="font-size: 0.72rem;">{{ log.action }}</span></td>
+              <td class="small text-secondary">{{ log.details }}</td>
+              <td class="font-monospace text-secondary small">{{ log.ip_address or '127.0.0.1' }}</td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="6" class="text-center py-4 text-secondary">
+              No audit log entries recorded yet.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function sendTestWebhookPing() {
+  const urlInput = document.getElementById('webhookUrlInput');
+  const targetUrl = urlInput ? urlInput.value.trim() : '';
+  const resultBox = document.getElementById('webhookTestResult');
+  
+  resultBox.className = 'mt-3 p-2 rounded small bg-dark border border-secondary text-info font-monospace';
+  resultBox.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Dispatching verification probe to target webhook...';
+  resultBox.classList.remove('d-none');
+
+  fetch('/settings/test-webhook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ webhook_url: targetUrl })
+  })
+  .then(res => res.json().then(data => ({ status: res.status, ok: res.ok, data })))
+  .then(({ ok, data }) => {
+    if (data.success) {
+      resultBox.className = 'mt-3 p-2 rounded small border border-success text-success font-monospace';
+      resultBox.innerHTML = `<i class="fas fa-circle-check me-2"></i><strong>[${data.platform || 'SUCCESS'}]</strong> ${data.message} (HTTP ${data.status_code})`;
+    } else {
+      resultBox.className = 'mt-3 p-2 rounded small border border-danger text-danger font-monospace';
+      resultBox.innerHTML = `<i class="fas fa-triangle-exclamation me-2"></i><strong>[FAILED]</strong> ${data.message}`;
+    }
+  })
+  .catch(err => {
+    resultBox.className = 'mt-3 p-2 rounded small border border-danger text-danger font-monospace';
+    resultBox.innerHTML = `<i class="fas fa-triangle-exclamation me-2"></i>Dispatch error: ${err.message}`;
+  });
+}
+</script>
+{% endblock %}

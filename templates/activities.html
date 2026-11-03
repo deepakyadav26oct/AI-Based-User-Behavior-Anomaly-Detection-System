@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+
+{% block title %}Activity Monitoring Telemetry | CyberGuard Sentinel{% endblock %}
+{% block page_title %}Monitored User Activities{% endblock %}
+{% block page_subtitle %}Real-Time Authentication Ingress Stream & Behavioral Telemetry Log{% endblock %}
+
+{% block content %}
+<div class="cyber-table-container">
+  <!-- Search & Filter Controls -->
+  <div class="p-3 border-bottom border-secondary">
+    <form method="GET" action="{{ url_for('activity.list_activities') }}" class="row g-2 align-items-center">
+      <div class="col-md-2">
+        <input type="text" name="user" class="cyber-input w-100 form-control-sm" placeholder="Search Username" value="{{ filters.user }}">
+      </div>
+      <div class="col-md-2">
+        <input type="text" name="ip" class="cyber-input w-100 form-control-sm" placeholder="Search IP Address" value="{{ filters.ip }}">
+      </div>
+      <div class="col-md-2">
+        <input type="date" name="date" class="cyber-input w-100 form-control-sm" value="{{ filters.date }}">
+      </div>
+      <div class="col-md-2">
+        <select name="status" class="cyber-select w-100 form-select-sm">
+          <option value="">All Statuses</option>
+          <option value="SUCCESS" {% if filters.status == 'SUCCESS' %}selected{% endif %}>SUCCESS</option>
+          <option value="FAILED" {% if filters.status == 'FAILED' %}selected{% endif %}>FAILED</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="risk" class="cyber-select w-100 form-select-sm">
+          <option value="">All Risk Tiers</option>
+          <option value="Low" {% if filters.risk == 'Low' %}selected{% endif %}>Low Risk</option>
+          <option value="Medium" {% if filters.risk == 'Medium' %}selected{% endif %}>Medium Risk</option>
+          <option value="High" {% if filters.risk == 'High' %}selected{% endif %}>High Risk</option>
+        </select>
+      </div>
+      <div class="col-md-1">
+        <select name="simulated" class="cyber-select w-100 form-select-sm">
+          <option value="">All Data</option>
+          <option value="real" {% if filters.simulated == 'real' %}selected{% endif %}>Real Only</option>
+          <option value="simulated" {% if filters.simulated == 'simulated' %}selected{% endif %}>Simulated</option>
+        </select>
+      </div>
+      <div class="col-md-1 d-flex gap-1">
+        <button type="submit" class="btn btn-cyber-primary btn-sm w-100"><i class="fas fa-search"></i></button>
+        <a href="{{ url_for('activity.list_activities') }}" class="btn btn-dark border border-secondary btn-sm" title="Clear Filters"><i class="fas fa-rotate"></i></a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Table Body -->
+  <div class="table-responsive">
+    <table class="cyber-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Timestamp (UTC)</th>
+          <th>User</th>
+          <th>Status</th>
+          <th>IP Address</th>
+          <th>Device / OS</th>
+          <th>Accessed Resource</th>
+          <th>Duration</th>
+          <th>Fails</th>
+          <th>ML Anomaly</th>
+          <th>Risk Score</th>
+          <th class="text-end">Forensics</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if activities %}
+          {% for act in activities %}
+            {% set det = act.detection_result %}
+            <tr>
+              <td class="font-monospace text-secondary">#{{ act.id }}</td>
+              <td class="font-monospace text-secondary" style="font-size: 0.8rem;">{{ act.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td>
+                <strong class="text-light">{{ act.username }}</strong>
+                {% if act.is_simulated %}
+                  <span class="badge-simulated ms-1">SIM</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if act.login_status == 'SUCCESS' %}
+                  <span class="badge bg-success font-monospace" style="font-size: 0.72rem;">SUCCESS</span>
+                {% else %}
+                  <span class="badge bg-danger font-monospace" style="font-size: 0.72rem;">FAILED</span>
+                {% endif %}
+              </td>
+              <td class="font-monospace text-secondary" style="font-size: 0.82rem;">{{ act.ip_address }}</td>
+              <td class="small text-secondary">{{ act.operating_system }} <span class="text-muted">({{ act.browser }})</span></td>
+              <td>
+                <code class="text-info small">{{ act.accessed_resource }}</code>
+                <span class="badge bg-dark border border-secondary text-secondary ms-1" style="font-size: 0.65rem;">{{ act.resource_sensitivity }}</span>
+              </td>
+              <td class="font-monospace small text-secondary">{{ (act.session_duration / 60)|round|int }}m</td>
+              <td class="font-monospace small {% if act.failed_login_count > 0 %}text-warning fw-bold{% else %}text-muted{% endif %}">{{ act.failed_login_count }}</td>
+              <td>
+                {% if det and det.is_ml_anomaly %}
+                  <span class="badge bg-danger font-monospace"><i class="fas fa-atom me-1"></i>OUTLIER</span>
+                {% else %}
+                  <span class="badge bg-dark border border-secondary text-secondary font-monospace">NORMAL</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if det %}
+                  {% if det.risk_level == 'High' %}
+                    <span class="badge-risk-high">{{ det.calculated_risk_score|round(1) }}</span>
+                  {% elif det.risk_level == 'Medium' %}
+                    <span class="badge-risk-med">{{ det.calculated_risk_score|round(1) }}</span>
+                  {% else %}
+                    <span class="badge-risk-low">{{ det.calculated_risk_score|round(1) }}</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted small">N/A</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-dark border border-secondary" onclick="inspectActivity({{ act.id }})" title="Open Forensic Inspector">
+                  <i class="fas fa-magnifying-glass text-info"></i>
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="12" class="text-center py-5 text-secondary">
+              <i class="fas fa-database fa-2x mb-2 d-block"></i>
+              No activity telemetry records found.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Footer -->
+  {% if pagination and pagination.pages > 1 %}
+    <div class="p-3 border-top border-secondary d-flex justify-content-between align-items-center">
+      <small class="text-secondary font-monospace">
+        Page {{ pagination.page }} of {{ pagination.pages }} ({{ pagination.total }} total events)
+      </small>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% if pagination.has_prev %}
+            <li class="page-item">
+              <a class="page-link bg-dark text-info border-secondary" href="{{ url_for('activity.list_activities', page=pagination.prev_num, **filters) }}">&laquo; Prev</a>
+            </li>
+          {% endif %}
+          <li class="page-item active">
+            <span class="page-link bg-info text-dark border-info fw-bold">{{ pagination.page }}</span>
+          </li>
+          {% if pagination.has_next %}
+            <li class="page-item">
+              <a class="page-link bg-dark text-info border-secondary" href="{{ url_for('activity.list_activities', page=pagination.next_num, **filters) }}">Next &raquo;</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

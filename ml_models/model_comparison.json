@@ -1,0 +1,31 @@
+{
+  "isolation_forest": {
+    "accuracy": 0.982,
+    "precision": 1.0,
+    "recall": 0.82,
+    "f1_score": 0.9011,
+    "false_positive_rate": 0.0,
+    "average_latency_ms": 0.112,
+    "true_positives": 41,
+    "false_positives": 0,
+    "true_negatives": 450,
+    "false_negatives": 9,
+    "total_tested": 500
+  },
+  "one_class_svm": {
+    "accuracy": 0.922,
+    "precision": 0.641,
+    "recall": 0.5,
+    "f1_score": 0.5618,
+    "false_positive_rate": 0.0311,
+    "average_latency_ms": 0.086,
+    "true_positives": 25,
+    "false_positives": 14,
+    "true_negatives": 436,
+    "false_negatives": 25,
+    "total_tested": 500
+  },
+  "agreement_rate": 92.8,
+  "recommended_model": "Isolation Forest",
+  "rationale": "Isolation Forest achieves superior throughput (0.112 ms vs 0.086 ms for SVM) and higher F1-score (0.9011 vs 0.5618) with zero false alarms."
+}

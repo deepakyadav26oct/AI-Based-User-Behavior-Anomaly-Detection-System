@@ -1,0 +1,12 @@
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+Flask-WTF==1.2.1
+WTForms==3.1.2
+scikit-learn==1.5.0
+pandas==2.2.2
+numpy>=1.26.4
+joblib==1.4.2
+reportlab==4.2.2
+faker==25.8.0
+pytest==8.2.2

@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+
+{% block title %}Security Alerts Triage Center | CyberGuard Sentinel{% endblock %}
+{% block page_title %}Security Alerts Management{% endblock %}
+{% block page_subtitle %}Incident Triage, Investigation Lifecycle & Threat Remediation{% endblock %}
+
+{% block content %}
+<!-- Alert Status Metrics Summary -->
+<div class="row g-3 mb-4">
+  <div class="col-md-2 col-sm-4">
+    <div class="cyber-card p-3">
+      <span class="card-title-muted">Total Dispatched</span>
+      <h3 class="mb-0 fw-bold text-light">{{ summary.total_alerts }}</h3>
+    </div>
+  </div>
+  <div class="col-md-2 col-sm-4">
+    <div class="cyber-card p-3 border-danger">
+      <span class="card-title-muted text-danger">Open / Unreviewed</span>
+      <h3 class="mb-0 fw-bold text-danger">{{ summary.open_alerts }}</h3>
+    </div>
+  </div>
+  <div class="col-md-2 col-sm-4">
+    <div class="cyber-card p-3 border-warning">
+      <span class="card-title-muted text-warning">Under Review</span>
+      <h3 class="mb-0 fw-bold text-warning">{{ summary.in_review_alerts }}</h3>
+    </div>
+  </div>
+  <div class="col-md-2 col-sm-4">
+    <div class="cyber-card p-3 border-success">
+      <span class="card-title-muted text-success">Resolved</span>
+      <h3 class="mb-0 fw-bold text-success">{{ summary.resolved_alerts }}</h3>
+    </div>
+  </div>
+  <div class="col-md-2 col-sm-4">
+    <div class="cyber-card p-3">
+      <span class="card-title-muted">Dismissed</span>
+      <h3 class="mb-0 fw-bold text-secondary">{{ summary.dismissed_alerts }}</h3>
+    </div>
+  </div>
+  <div class="col-md-2 col-sm-4">
+    <div class="cyber-card p-3" style="box-shadow: 0 0 15px rgba(255, 51, 102, 0.2);">
+      <span class="card-title-muted text-danger">Critical / High</span>
+      <h3 class="mb-0 fw-bold text-danger">{{ summary.critical_high_alerts }}</h3>
+    </div>
+  </div>
+</div>
+
+<div class="cyber-table-container">
+  <!-- Filter Bar -->
+  <div class="p-3 border-bottom border-secondary">
+    <form method="GET" action="{{ url_for('alert.list_alerts') }}" class="row g-2 align-items-center">
+      <div class="col-md-3">
+        <input type="text" name="user" class="cyber-input w-100 form-control-sm" placeholder="Filter by User" value="{{ filters.user }}">
+      </div>
+      <div class="col-md-3">
+        <select name="severity" class="cyber-select w-100 form-select-sm">
+          <option value="">All Severities</option>
+          <option value="Critical" {% if filters.severity == 'Critical' %}selected{% endif %}>Critical Severity</option>
+          <option value="High" {% if filters.severity == 'High' %}selected{% endif %}>High Severity</option>
+          <option value="Medium" {% if filters.severity == 'Medium' %}selected{% endif %}>Medium Severity</option>
+          <option value="Low" {% if filters.severity == 'Low' %}selected{% endif %}>Low Severity</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="status" class="cyber-select w-100 form-select-sm">
+          <option value="">All Alert Statuses</option>
+          <option value="OPEN" {% if filters.status == 'OPEN' %}selected{% endif %}>OPEN</option>
+          <option value="IN_REVIEW" {% if filters.status == 'IN_REVIEW' %}selected{% endif %}>IN_REVIEW</option>
+          <option value="RESOLVED" {% if filters.status == 'RESOLVED' %}selected{% endif %}>RESOLVED</option>
+          <option value="DISMISSED" {% if filters.status == 'DISMISSED' %}selected{% endif %}>DISMISSED</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select name="simulated" class="cyber-select w-100 form-select-sm">
+          <option value="">All Incidents</option>
+          <option value="real" {% if filters.simulated == 'real' %}selected{% endif %}>Real Only</option>
+          <option value="simulated" {% if filters.simulated == 'simulated' %}selected{% endif %}>Simulated Only</option>
+        </select>
+      </div>
+      <div class="col-md-1 d-flex gap-1">
+        <button type="submit" class="btn btn-cyber-primary btn-sm w-100"><i class="fas fa-filter"></i></button>
+        <a href="{{ url_for('alert.list_alerts') }}" class="btn btn-dark border border-secondary btn-sm"><i class="fas fa-rotate"></i></a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Alerts Table -->
+  <div class="table-responsive">
+    <table class="cyber-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Incident Title</th>
+          <th>Principal</th>
+          <th>Risk Score</th>
+          <th>Severity</th>
+          <th>Dispatched (UTC)</th>
+          <th>Status</th>
+          <th>Resolution Details</th>
+          <th class="text-end">Triage Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if alerts %}
+          {% for a in alerts %}
+            <tr>
+              <td class="font-monospace text-secondary">#{{ a.id }}</td>
+              <td>
+                <div class="fw-bold text-light">{{ a.alert_title }}</div>
+                <small class="text-secondary font-monospace" style="font-size: 0.72rem;">Type: {{ a.alert_type }}</small>
+              </td>
+              <td>
+                <strong class="text-info">{{ a.username }}</strong>
+                {% if a.is_simulated %}
+                  <span class="badge-simulated ms-1">SIM</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="font-monospace fw-bold {% if a.risk_score >= 70 %}text-danger{% elif a.risk_score >= 30 %}text-warning{% else %}text-success{% endif %}">
+                  {{ a.risk_score|round(1) }}
+                </span>
+              </td>
+              <td>
+                {% if a.severity in ['Critical', 'High'] %}
+                  <span class="badge-risk-high">{{ a.severity }}</span>
+                {% elif a.severity == 'Medium' %}
+                  <span class="badge-risk-med">{{ a.severity }}</span>
+                {% else %}
+                  <span class="badge-risk-low">{{ a.severity }}</span>
+                {% endif %}
+              </td>
+              <td class="font-monospace text-secondary" style="font-size: 0.8rem;">
+                {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}
+              </td>
+              <td>
+                {% if a.status == 'OPEN' %}
+                  <span class="badge badge-status-open">OPEN</span>
+                {% elif a.status == 'IN_REVIEW' %}
+                  <span class="badge badge-status-review">IN REVIEW</span>
+                {% elif a.status == 'RESOLVED' %}
+                  <span class="badge badge-status-resolved">RESOLVED</span>
+                {% else %}
+                  <span class="badge badge-status-dismissed">DISMISSED</span>
+                {% endif %}
+              </td>
+              <td class="small text-secondary" style="max-width: 200px;">
+                {% if a.resolved_by %}
+                  <div><strong class="text-light">{{ a.resolved_by }}</strong> ({{ a.resolved_at.strftime('%m-%d %H:%M') if a.resolved_at else '' }})</div>
+                  <div class="text-truncate">{{ a.resolution_notes }}</div>
+                {% else %}
+                  <span class="text-muted">Awaiting SOC triage</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="btn-group btn-group-sm">
+                  {% if a.activity_id %}
+                    <button class="btn btn-dark border border-secondary" onclick="inspectActivity({{ a.activity_id }})" title="View Telemetry Forensics">
+                      <i class="fas fa-magnifying-glass text-info"></i>
+                    </button>
+                  {% endif %}
+
+                  {% if a.activity and a.activity.ip_address and a.activity.ip_address != 'N/A' %}
+                    <button class="btn btn-dark border border-secondary text-danger" onclick="quarantineIP('{{ a.activity.ip_address }}', 'Quarantined from Alert #{{ a.id }}')" title="SOAR Quarantine IP">
+                      <i class="fas fa-shield-virus"></i>
+                    </button>
+                  {% endif %}
+
+                  {% if a.status == 'OPEN' %}
+                    <form method="POST" action="{{ url_for('alert.review_alert', alert_id=a.id) }}" class="d-inline">
+                      <button type="submit" class="btn btn-dark border border-secondary text-warning" title="Acknowledge / Review">
+                        <i class="fas fa-eye"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+
+                  {% if a.status in ['OPEN', 'IN_REVIEW'] %}
+                    <button class="btn btn-dark border border-secondary text-success" data-bs-toggle="modal" data-bs-target="#resolveModal{{ a.id }}" title="Resolve Incident">
+                      <i class="fas fa-check"></i>
+                    </button>
+                    <button class="btn btn-dark border border-secondary text-secondary" data-bs-toggle="modal" data-bs-target="#dismissModal{{ a.id }}" title="Dismiss">
+                      <i class="fas fa-xmark"></i>
+                    </button>
+                  {% endif %}
+                </div>
+
+                <!-- Resolve Modal -->
+                <div class="modal fade cyber-modal" id="resolveModal{{ a.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                      <form method="POST" action="{{ url_for('alert.resolve_alert', alert_id=a.id) }}">
+                        <div class="modal-header">
+                          <h6 class="modal-title font-monospace text-success"><i class="fas fa-shield-check me-2"></i>Resolve Security Alert #{{ a.id }}</h6>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                          <label class="form-label small text-secondary">Document Remediation Notes / Mitigation Taken:</label>
+                          <textarea name="resolution_notes" class="form-control cyber-input" rows="3" required placeholder="User credentials rotated; IP blacklisted on firewall; verified with user."></textarea>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" class="btn btn-success btn-sm">Resolve Incident</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Dismiss Modal -->
+                <div class="modal fade cyber-modal" id="dismissModal{{ a.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                      <form method="POST" action="{{ url_for('alert.dismiss_alert', alert_id=a.id) }}">
+                        <div class="modal-header">
+                          <h6 class="modal-title font-monospace text-secondary"><i class="fas fa-circle-xmark me-2"></i>Dismiss Alert #{{ a.id }}</h6>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                          <label class="form-label small text-secondary">Reason for Dismissal:</label>
+                          <input type="text" name="dismissal_reason" class="form-control cyber-input" required placeholder="Authorized off-hours maintenance window">
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" class="btn btn-warning btn-sm">Confirm Dismissal</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="9" class="text-center py-5 text-secondary">
+              <i class="fas fa-bell-slash fa-2x mb-2 d-block"></i>
+              No security alerts currently recorded.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination and pagination.pages > 1 %}
+    <div class="p-3 border-top border-secondary d-flex justify-content-between align-items-center">
+      <small class="text-secondary font-monospace">Page {{ pagination.page }} of {{ pagination.pages }}</small>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% if pagination.has_prev %}
+            <li class="page-item">
+              <a class="page-link bg-dark text-info border-secondary" href="{{ url_for('alert.list_alerts', page=pagination.prev_num, **filters) }}">&laquo; Prev</a>
+            </li>
+          {% endif %}
+          <li class="page-item active"><span class="page-link bg-info text-dark border-info fw-bold">{{ pagination.page }}</span></li>
+          {% if pagination.has_next %}
+            <li class="page-item">
+              <a class="page-link bg-dark text-info border-secondary" href="{{ url_for('alert.list_alerts', page=pagination.next_num, **filters) }}">Next &raquo;</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

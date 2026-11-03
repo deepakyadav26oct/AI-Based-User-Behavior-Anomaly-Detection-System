@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management & Baselines | CyberGuard Sentinel{% endblock %}
+{% block page_title %}User Management & Profile Baselines{% endblock %}
+{% block page_subtitle %}Provision User Identifiers, Inspect Behavioral Baselines & Enforce Baseline Locks{% endblock %}
+
+{% block content %}
+<div class="cyber-table-container">
+  <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="mb-0 fw-bold text-light"><i class="fas fa-users-gear text-info me-2"></i>Monitored Corporate Identities</h6>
+      <small class="text-secondary font-monospace">Identity roster with automated behavioral profile baselines</small>
+    </div>
+
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <button class="btn btn-cyber-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+      <i class="fas fa-user-plus me-1"></i>Provision New User
+    </button>
+    {% endif %}
+  </div>
+
+  <div class="table-responsive">
+    <table class="cyber-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Corporate Email</th>
+          <th>Role</th>
+          <th>Department</th>
+          <th>Baseline Status</th>
+          <th>Account State</th>
+          <th>Last Login (UTC)</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+          {% set prof = u.profile %}
+          <tr>
+            <td class="font-monospace text-secondary">#{{ u.id }}</td>
+            <td>
+              <strong class="text-light">{{ u.username }}</strong>
+              {% if u.id == current_user.id %}
+                <span class="badge bg-dark border border-info text-info ms-1" style="font-size: 0.65rem;">YOU</span>
+              {% endif %}
+            </td>
+            <td class="text-secondary small">{{ u.email }}</td>
+            <td>
+              {% if u.role == 'admin' %}
+                <span class="badge bg-danger font-monospace" style="font-size: 0.72rem;">ADMIN</span>
+              {% elif u.role == 'analyst' %}
+                <span class="badge bg-info text-dark font-monospace" style="font-size: 0.72rem;">ANALYST</span>
+              {% else %}
+                <span class="badge bg-secondary font-monospace" style="font-size: 0.72rem;">USER</span>
+              {% endif %}
+            </td>
+            <td class="small text-secondary">{{ u.department }}</td>
+            <td>
+              {% if prof and prof.is_baseline_locked %}
+                <span class="badge bg-danger font-monospace" style="font-size: 0.7rem;"><i class="fas fa-lock me-1"></i>LOCKED</span>
+              {% else %}
+                <span class="badge bg-success font-monospace" style="font-size: 0.7rem;"><i class="fas fa-lock-open me-1"></i>LEARNING</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.is_locked %}
+                <span class="badge bg-danger font-monospace" style="font-size: 0.7rem; box-shadow: 0 0 8px rgba(255, 51, 102, 0.4);" title="{{ u.lock_reason }}">
+                  <i class="fas fa-shield-virus me-1"></i>AI LOCKED
+                </span>
+              {% elif u.is_active %}
+                <span class="badge bg-success font-monospace" style="font-size: 0.7rem;">ACTIVE</span>
+              {% else %}
+                <span class="badge bg-secondary font-monospace" style="font-size: 0.7rem;">DISABLED</span>
+              {% endif %}
+            </td>
+            <td class="font-monospace text-secondary" style="font-size: 0.8rem;">
+              {{ u.last_login_at.strftime('%Y-%m-%d %H:%M') if u.last_login_at else 'Never' }}
+            </td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <!-- Inspect Baseline Button -->
+                <button class="btn btn-dark border border-secondary text-info" onclick="inspectUserProfile({{ u.id }})" title="Inspect Baseline Profile">
+                  <i class="fas fa-id-card"></i>
+                </button>
+
+                {% if u.is_locked and current_user.is_authenticated and current_user.is_admin %}
+                  <form method="POST" action="{{ url_for('user.unlock_account', user_id=u.id) }}" class="d-inline">
+                    <button type="submit" class="btn btn-dark border border-danger text-danger" title="Emergency AI Unlock" onclick="return confirm('Unlock account for {{ u.username }}?');">
+                      <i class="fas fa-key"></i>
+                    </button>
+                  </form>
+                {% endif %}
+
+                {% if current_user.is_authenticated and current_user.is_admin %}
+                  <!-- Lock/Unlock Baseline Form -->
+                  <form method="POST" action="{{ url_for('user.toggle_baseline_lock', user_id=u.id) }}" class="d-inline">
+                    <button type="submit" class="btn btn-dark border border-secondary {% if prof and prof.is_baseline_locked %}text-success{% else %}text-warning{% endif %}" title="{% if prof and prof.is_baseline_locked %}Unlock Baseline (Resume Learning){% else %}Lock Baseline (Freeze Profile Safeguard){% endif %}">
+                      <i class="fas {% if prof and prof.is_baseline_locked %}fa-lock-open{% else %}fa-lock{% endif %}"></i>
+                    </button>
+                  </form>
+
+                  <!-- Toggle Active State Form -->
+                  {% if u.id != current_user.id %}
+                    <form method="POST" action="{{ url_for('user.toggle_status', user_id=u.id) }}" class="d-inline">
+                      <button type="submit" class="btn btn-dark border border-secondary {% if u.is_active %}text-danger{% else %}text-success{% endif %}" title="{% if u.is_active %}Deactivate Account{% else %}Activate Account{% endif %}" onclick="return confirm('Change active status for user {{ u.username }}?');">
+                        <i class="fas {% if u.is_active %}fa-user-slash{% else %}fa-user-check{% endif %}"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Provision New User Modal -->
+{% if current_user.is_authenticated and current_user.is_admin %}
+<div class="modal fade cyber-modal" id="addUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('user.add_user') }}">
+        <div class="modal-header">
+          <h6 class="modal-title font-monospace text-info"><i class="fas fa-user-plus me-2"></i>Provision User Identity</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label text-secondary small font-monospace">Username</label>
+            <input type="text" name="username" class="form-control cyber-input" required placeholder="e.g. sarah.connor">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary small font-monospace">Corporate Email</label>
+            <input type="email" name="email" class="form-control cyber-input" required placeholder="s.connor@cyberguard.internal">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-secondary small font-monospace">Initial Password</label>
+            <input type="password" name="password" class="form-control cyber-input" required placeholder="••••••••••••">
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label text-secondary small font-monospace">Security Role</label>
+              <select name="role" class="cyber-select w-100">
+                <option value="user">User (Standard)</option>
+                <option value="analyst">Security Analyst</option>
+                <option value="admin">Administrator (SOC)</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-secondary small font-monospace">Department</label>
+              <input type="text" name="department" class="form-control cyber-input" placeholder="Engineering">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-cyber-primary btn-sm">Provision Identity & Baseline</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

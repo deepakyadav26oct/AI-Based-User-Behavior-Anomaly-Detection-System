@@ -1,0 +1,359 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard Overview | CyberGuard Sentinel{% endblock %}
+{% block page_title %}Security Monitoring Dashboard{% endblock %}
+{% block page_subtitle %}Live User Behavioral Anomaly Telemetry & Attack Surface Overview{% endblock %}
+
+{% block content %}
+<!-- Live Telemetry Stream HUD Banner -->
+<div class="p-2 px-3 rounded mb-3 d-flex justify-content-between align-items-center" style="background: rgba(0, 242, 254, 0.04); border: 1px solid rgba(0, 242, 254, 0.2);">
+  <div class="d-flex align-items-center gap-2">
+    <span class="spinner-grow spinner-grow-sm text-success" role="status" id="ssePulseDot"></span>
+    <span class="font-monospace small text-light fw-bold" id="sseStatusBadge">LIVE TELEMETRY STREAM: CONNECTED</span>
+    <span class="text-secondary small font-monospace d-none d-md-inline">|</span>
+    <span class="text-secondary small font-monospace d-none d-md-inline" id="sseLatestEventText">Listening for incoming authentication telemetry...</span>
+  </div>
+  <div class="d-flex align-items-center gap-2 font-monospace small">
+    <span class="badge bg-dark border border-secondary text-info"><i class="fas fa-tower-broadcast me-1"></i>SSE ACTIVE</span>
+  </div>
+</div>
+
+<!-- Metric Overview Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="cyber-card">
+      <div class="card-title-muted">
+        <span>Total Users</span>
+        <i class="fas fa-users text-info"></i>
+      </div>
+      <div class="card-metric-value" id="metricTotalUsers">{{ total_users }}</div>
+      <div class="card-subtext"><span class="text-success"><i class="fas fa-id-badge me-1"></i>Active accounts</span></div>
+    </div>
+  </div>
+
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="cyber-card">
+      <div class="card-title-muted">
+        <span>Total Logins</span>
+        <i class="fas fa-arrow-right-to-bracket text-primary"></i>
+      </div>
+      <div class="card-metric-value" id="metricTotalLogins">{{ total_logins }}</div>
+      <div class="card-subtext"><span class="text-info font-monospace">{{ successful_logins }} verified</span></div>
+    </div>
+  </div>
+
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="cyber-card">
+      <div class="card-title-muted">
+        <span>Failed Logins</span>
+        <i class="fas fa-ban text-warning"></i>
+      </div>
+      <div class="card-metric-value text-warning" id="metricFailedLogins">{{ failed_logins }}</div>
+      <div class="card-subtext"><span class="text-secondary font-monospace">{{ ((failed_logins / total_logins * 100) if total_logins > 0 else 0)|round(1) }}% failure rate</span></div>
+    </div>
+  </div>
+
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="cyber-card">
+      <div class="card-title-muted">
+        <span>Suspicious</span>
+        <i class="fas fa-triangle-exclamation text-warning"></i>
+      </div>
+      <div class="card-metric-value text-warning" id="metricSuspicious">{{ suspicious_count }}</div>
+      <div class="card-subtext"><span class="text-secondary">Risk score &ge; 30</span></div>
+    </div>
+  </div>
+
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="cyber-card">
+      <div class="card-title-muted">
+        <span>High-Risk Events</span>
+        <i class="fas fa-radiation text-danger"></i>
+      </div>
+      <div class="card-metric-value text-danger" id="metricHighRisk">{{ high_risk_count }}</div>
+      <div class="card-subtext"><span class="text-danger font-monospace">Risk score &ge; 70</span></div>
+    </div>
+  </div>
+
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="cyber-card" style="border-color: rgba(255, 51, 102, 0.4); box-shadow: 0 0 15px rgba(255, 51, 102, 0.1);">
+      <div class="card-title-muted">
+        <span>Open Alerts</span>
+        <i class="fas fa-bell text-danger"></i>
+      </div>
+      <div class="card-metric-value text-danger" id="metricOpenAlerts">{{ open_alerts_count }}</div>
+      <div class="card-subtext"><span class="text-danger"><i class="fas fa-circle-exclamation me-1"></i>Require SOC triage</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Interactive Global Cyber Attack Threat Map (with OpenStreetMap free source & refresh button) -->
+<div class="cyber-card mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary">
+    <div class="d-flex align-items-center gap-2">
+      <i class="fas fa-globe-americas text-info fa-lg"></i>
+      <div>
+        <h6 class="mb-0 fw-bold text-light">Global Attack Surface & Authentication Ingress Map</h6>
+        <small class="text-secondary font-monospace">Real-time geographical telemetry & impossible travel flight vectors</small>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 font-monospace small">
+      <span class="badge bg-dark border border-secondary text-success"><i class="fas fa-circle text-success me-1"></i>Nominal (&lt;30)</span>
+      <span class="badge bg-dark border border-secondary text-warning"><i class="fas fa-circle text-warning me-1"></i>Elevated (30-69)</span>
+      <span class="badge bg-dark border border-secondary text-danger"><i class="fas fa-circle text-danger me-1"></i>Critical Anomaly (&ge;70)</span>
+      <span class="badge bg-dark border border-secondary text-info"><i class="fas fa-plane-departure text-info me-1"></i>Velocity Arc</span>
+      <button type="button" class="btn btn-outline-info btn-sm py-0 px-2 font-monospace" style="font-size: 0.72rem;" onclick="initCyberThreatMap()" title="Refresh Threat Map Telemetry">
+        <i class="fas fa-arrows-rotate me-1"></i>Refresh Map
+      </button>
+    </div>
+  </div>
+  <div id="cyberThreatMap" style="height: 420px; width: 100%; border-radius: 6px; border: 1px solid #212c3d; background: #080c14; position: relative; z-index: 1;"></div>
+</div>
+
+<!-- Charts Section: 4 Charts -->
+<div class="row g-3 mb-4">
+  <!-- Daily Trend Line Chart -->
+  <div class="col-lg-8">
+    <div class="chart-box">
+      <div class="chart-header">
+        <div class="chart-title">
+          <i class="fas fa-chart-area text-info"></i>
+          <span>Activity & Anomaly Velocity (Last 7 Days)</span>
+        </div>
+        <span class="badge bg-dark border border-secondary text-secondary small font-monospace">Daily Aggregation</span>
+      </div>
+      <div style="height: 250px;">
+        <canvas id="dailyTrendChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Normal vs Anomalous Doughnut Chart -->
+  <div class="col-lg-4">
+    <div class="chart-box">
+      <div class="chart-header">
+        <div class="chart-title">
+          <i class="fas fa-chart-pie text-info"></i>
+          <span>ML Anomaly Distribution</span>
+        </div>
+        <span class="badge bg-dark border border-secondary text-secondary small font-monospace">Isolation Forest</span>
+      </div>
+      <div style="height: 250px;">
+        <canvas id="anomalyDoughnutChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Risk Score Categories Bar Chart -->
+  <div class="col-lg-6">
+    <div class="chart-box">
+      <div class="chart-header">
+        <div class="chart-title">
+          <i class="fas fa-layer-group text-info"></i>
+          <span>Risk Level Categorization Breakdown</span>
+        </div>
+        <span class="badge bg-dark border border-secondary text-secondary small font-monospace">Low / Med / High</span>
+      </div>
+      <div style="height: 220px;">
+        <canvas id="riskDistributionChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hourly Activity Histogram -->
+  <div class="col-lg-6">
+    <div class="chart-box">
+      <div class="chart-header">
+        <div class="chart-title">
+          <i class="fas fa-business-time text-info"></i>
+          <span>Ingress Volume by Hour of Day</span>
+        </div>
+        <span class="badge bg-dark border border-secondary text-secondary small font-monospace">24-Hour Cycle</span>
+      </div>
+      <div style="height: 220px;">
+        <canvas id="hourlyActivityChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Security Alerts & Triage Table -->
+<div class="cyber-table-container mb-4">
+  <div class="p-3 border-bottom border-secondary d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <h6 class="mb-0 fw-bold text-light"><i class="fas fa-triangle-exclamation text-danger me-2"></i>Security Alerts Dispatch Log</h6>
+      <small class="text-secondary font-monospace">Latest security incidents generated by AI risk scoring engine</small>
+    </div>
+
+    <!-- Filter Form -->
+    <form method="GET" action="{{ url_for('dashboard.overview') }}" class="d-flex align-items-center gap-2 flex-wrap">
+      <input type="text" name="user" class="cyber-input form-control-sm" placeholder="Filter by User" value="{{ current_filters.user }}">
+      <input type="text" name="ip" class="cyber-input form-control-sm" placeholder="Filter by IP" value="{{ current_filters.ip }}">
+      
+      <select name="severity" class="cyber-select form-select-sm">
+        <option value="">All Severities</option>
+        <option value="Critical" {% if current_filters.severity == 'Critical' %}selected{% endif %}>Critical</option>
+        <option value="High" {% if current_filters.severity == 'High' %}selected{% endif %}>High</option>
+        <option value="Medium" {% if current_filters.severity == 'Medium' %}selected{% endif %}>Medium</option>
+        <option value="Low" {% if current_filters.severity == 'Low' %}selected{% endif %}>Low</option>
+      </select>
+
+      <select name="status" class="cyber-select form-select-sm">
+        <option value="">All Statuses</option>
+        <option value="OPEN" {% if current_filters.status == 'OPEN' %}selected{% endif %}>OPEN</option>
+        <option value="IN_REVIEW" {% if current_filters.status == 'IN_REVIEW' %}selected{% endif %}>IN_REVIEW</option>
+        <option value="RESOLVED" {% if current_filters.status == 'RESOLVED' %}selected{% endif %}>RESOLVED</option>
+        <option value="DISMISSED" {% if current_filters.status == 'DISMISSED' %}selected{% endif %}>DISMISSED</option>
+      </select>
+
+      <button type="submit" class="btn btn-cyber-outline btn-sm"><i class="fas fa-filter me-1"></i>Filter</button>
+      <a href="{{ url_for('dashboard.overview') }}" class="btn btn-sm btn-dark border border-secondary" title="Reset Filters"><i class="fas fa-rotate-left"></i></a>
+    </form>
+  </div>
+
+  <div class="table-responsive">
+    <table class="cyber-table">
+      <thead>
+        <tr>
+          <th>Alert ID</th>
+          <th>Principal</th>
+          <th>IP Address</th>
+          <th>Incident Type</th>
+          <th>Risk Score</th>
+          <th>Severity</th>
+          <th>Timestamp (UTC)</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="recentAlertsTableBody">
+        {% if recent_alerts %}
+          {% for alert in recent_alerts %}
+            <tr>
+              <td class="font-monospace text-secondary">#{{ alert.id }}</td>
+              <td>
+                <strong class="text-light">{{ alert.username }}</strong>
+                {% if alert.is_simulated %}
+                  <span class="badge-simulated ms-1">SIM</span>
+                {% endif %}
+              </td>
+              <td class="font-monospace text-secondary">{{ alert.activity.ip_address if alert.activity else 'N/A' }}</td>
+              <td>
+                <span class="text-light">{{ alert.alert_title }}</span>
+              </td>
+              <td>
+                <strong class="font-monospace {% if alert.risk_score >= 70 %}text-danger{% elif alert.risk_score >= 30 %}text-warning{% else %}text-success{% endif %}">
+                  {{ alert.risk_score|round(1) }}
+                </strong>
+              </td>
+              <td>
+                {% if alert.severity in ['Critical', 'High'] %}
+                  <span class="badge-risk-high">{{ alert.severity }}</span>
+                {% elif alert.severity == 'Medium' %}
+                  <span class="badge-risk-med">{{ alert.severity }}</span>
+                {% else %}
+                  <span class="badge-risk-low">{{ alert.severity }}</span>
+                {% endif %}
+              </td>
+              <td class="font-monospace text-secondary" style="font-size: 0.8rem;">
+                {{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}
+              </td>
+              <td>
+                {% if alert.status == 'OPEN' %}
+                  <span class="badge badge-status-open">OPEN</span>
+                {% elif alert.status == 'IN_REVIEW' %}
+                  <span class="badge badge-status-review">IN REVIEW</span>
+                {% elif alert.status == 'RESOLVED' %}
+                  <span class="badge badge-status-resolved">RESOLVED</span>
+                {% else %}
+                  <span class="badge badge-status-dismissed">DISMISSED</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="btn-group btn-group-sm">
+                  {% if alert.activity_id %}
+                    <button class="btn btn-dark border border-secondary" onclick="inspectActivity({{ alert.activity_id }})" title="View Telemetry Forensics">
+                      <i class="fas fa-magnifying-glass text-info"></i>
+                    </button>
+                  {% endif %}
+
+                  {% if alert.status == 'OPEN' %}
+                    <form method="POST" action="{{ url_for('alert.review_alert', alert_id=alert.id) }}" class="d-inline">
+                      <button type="submit" class="btn btn-dark border border-secondary text-warning" title="Triage Alert">
+                        <i class="fas fa-eye"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+
+                  {% if alert.status in ['OPEN', 'IN_REVIEW'] %}
+                    <button class="btn btn-dark border border-secondary text-success" data-bs-toggle="modal" data-bs-target="#resolveModal{{ alert.id }}" title="Resolve">
+                      <i class="fas fa-check"></i>
+                    </button>
+                    <button class="btn btn-dark border border-secondary text-secondary" data-bs-toggle="modal" data-bs-target="#dismissModal{{ alert.id }}" title="Dismiss">
+                      <i class="fas fa-xmark"></i>
+                    </button>
+                  {% endif %}
+                </div>
+
+                <!-- Resolve Modal -->
+                <div class="modal fade cyber-modal" id="resolveModal{{ alert.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                      <form method="POST" action="{{ url_for('alert.resolve_alert', alert_id=alert.id) }}">
+                        <div class="modal-header">
+                          <h6 class="modal-title font-monospace text-success"><i class="fas fa-shield-check me-2"></i>Resolve Alert #{{ alert.id }}</h6>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                          <p class="small text-secondary mb-2">Principal: <strong>{{ alert.username }}</strong> &bull; Incident: {{ alert.alert_title }}</p>
+                          <label class="form-label small text-secondary">Resolution / Forensic Mitigation Notes:</label>
+                          <textarea name="resolution_notes" class="form-control cyber-input" rows="3" required placeholder="User identity verified via out-of-band channel; MFA enforced."></textarea>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" class="btn btn-success btn-sm">Confirm Resolution</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Dismiss Modal -->
+                <div class="modal fade cyber-modal" id="dismissModal{{ alert.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                      <form method="POST" action="{{ url_for('alert.dismiss_alert', alert_id=alert.id) }}">
+                        <div class="modal-header">
+                          <h6 class="modal-title font-monospace text-secondary"><i class="fas fa-circle-xmark me-2"></i>Dismiss Alert #{{ alert.id }}</h6>
+                          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-start">
+                          <p class="small text-secondary mb-2">Mark as acceptable risk or false positive.</p>
+                          <label class="form-label small text-secondary">Dismissal Justification:</label>
+                          <input type="text" name="dismissal_reason" class="form-control cyber-input" required placeholder="Authorized penetration testing exercise">
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                          <button type="submit" class="btn btn-warning btn-sm">Confirm Dismissal</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="9" class="text-center py-4 text-secondary">
+              <i class="fas fa-shield-check fa-2x text-success mb-2 d-block"></i>
+              No security alerts matching current filter parameters.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
