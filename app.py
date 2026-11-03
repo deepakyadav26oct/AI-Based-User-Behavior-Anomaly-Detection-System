@@ -95,7 +95,7 @@ def initialize_database_and_seed(app):
             admin.set_password(Config.DEFAULT_ADMIN_PASSWORD)
             db.session.add(admin)
             db.session.commit()
-            print(f"[Seed] Created Administrator: {admin_username} / {Config.DEFAULT_ADMIN_PASSWORD}")
+            print(f"[Seed] Created Administrator: {admin_username}")
             
             # Create admin profile
             BehaviourProfiler.get_or_create_profile(admin.id)
