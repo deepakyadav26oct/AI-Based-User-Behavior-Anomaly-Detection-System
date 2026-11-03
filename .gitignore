@@ -5,7 +5,7 @@ venv/
 
 # Python Cache
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
 
 # Environment Variables
@@ -16,13 +16,11 @@ __pycache__/
 .vscode/
 .idea/
 
-# Temporary Files
-*.log
-*.tmp
+# Generated Reports
+reports/*.pdf
 
 # Local Database
 instance/*.db
 
-# Generated Reports
-reports/*
-!reports/.gitkeep
+# Logs
+*.log
